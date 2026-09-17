@@ -11,9 +11,9 @@
 
 ## 2. Modelo de Dados e Migração
 
-- [ ] 2.1 Criar a migração Flyway (`V1__create_nutricionistas.sql`) para a tabela `nutricionistas` (`id`, `nome`, `empresa` opcional, `email` único, `password_hash` opcional, `google_subject` opcional e único, `criado_em`) e verificar que a migração aplica sem erro em ambiente local
-- [ ] 2.2 Criar a migração Flyway (`V2__create_revoked_tokens.sql`) para a tabela `revoked_tokens` (`id`, `jti` único, `expira_em`) e verificar que a migração aplica sem erro
-- [ ] 2.3 Implementar a entidade JPA `Nutricionista` (campos `nome`, `empresa` nullable, `email`, `passwordHash` nullable, `googleSubject` nullable) e o repositório `NutricionistaRepository` (busca por e-mail case-insensitive e busca por `googleSubject`) e verificar com um teste de repositório (`@DataJpaTest`) que as constraints de unicidade de e-mail e de `google_subject` são respeitadas
+- [ ] 2.1 Criar a migração Flyway (`V1__create_nutritionists.sql`) para a tabela `nutritionists` (`id`, `name`, `company` opcional, `email` único, `password_hash` opcional, `google_subject` opcional e único, `created_at`) e verificar que a migração aplica sem erro em ambiente local
+- [ ] 2.2 Criar a migração Flyway (`V2__create_revoked_tokens.sql`) para a tabela `revoked_tokens` (`id`, `jti` único, `expires_at`) e verificar que a migração aplica sem erro
+- [ ] 2.3 Implementar a entidade JPA `Nutritionist` (campos `name`, `company` nullable, `email`, `passwordHash` nullable, `googleSubject` nullable) e o repositório `NutritionistRepository` (busca por e-mail case-insensitive e busca por `googleSubject`) e verificar com um teste de repositório (`@DataJpaTest`) que as constraints de unicidade de e-mail e de `google_subject` são respeitadas
 - [ ] 2.4 Implementar a entidade JPA `RevokedToken` e o repositório `RevokedTokenRepository` e verificar com um teste de repositório que um `jti` inserido é encontrado por busca e que duplicatas são rejeitadas
 
 ## 3. Camada de Segurança
@@ -30,9 +30,9 @@
 
 ## 5. Endpoint de Cadastro de Nutricionista
 
-- [ ] 5.1 Implementar os DTOs `RegisterRequest` (campos `nome` com `@NotBlank`, `email` com `@Email`, `senha` com validação de política de senha, `empresa` opcional sem `@NotBlank`) e `NutricionistaResponse` (nome, empresa, email — sem senha/hash) e verificar com testes unitários que payloads inválidos (nome vazio, e-mail malformado, senha fraca) disparam violação de validação, e que a ausência de empresa não dispara violação
-- [ ] 5.2 Implementar `NutricionistaService.registrar` (normaliza e-mail para lowercase, verifica duplicidade, aplica hash de senha, persiste nome/empresa/email/senha) e verificar com um teste unitário que um e-mail já existente lança a exceção de conflito mapeada em 4.2
-- [ ] 5.3 Implementar `NutricionistaController` com `POST /api/nutricionistas` e verificar com um teste de integração (`MockMvc`) os cenários de sucesso com e sem empresa (HTTP 201 + corpo sem senha) do spec `nutritionist-auth`
+- [ ] 5.1 Implementar os DTOs `RegisterRequest` (campos `name` com `@NotBlank`, `email` com `@Email`, `password` com validação de política de senha, `company` opcional sem `@NotBlank`) e `NutritionistResponse` (name, company, email — sem senha/hash) e verificar com testes unitários que payloads inválidos (nome vazio, e-mail malformado, senha fraca) disparam violação de validação, e que a ausência de empresa não dispara violação
+- [ ] 5.2 Implementar `NutritionistService.register` (normaliza e-mail para lowercase, verifica duplicidade, aplica hash de senha, persiste name/company/email/password) e verificar com um teste unitário que um e-mail já existente lança a exceção de conflito mapeada em 4.2
+- [ ] 5.3 Implementar `NutritionistController` com `POST /api/nutricionistas` e verificar com um teste de integração (`MockMvc`) os cenários de sucesso com e sem empresa (HTTP 201 + corpo sem senha) do spec `nutritionist-auth`
 - [ ] 5.4 Verificar com testes de integração os cenários de rejeição do spec `nutritionist-auth` (e-mail duplicado → 409, campo obrigatório ausente → 400, e-mail inválido → 400, senha fraca → 400)
 
 ## 6. Endpoint de Login (E-mail/Senha)
@@ -46,7 +46,7 @@
 
 - [ ] 7.1 Implementar o DTO `GoogleLoginRequest` (campo `idToken`) e verificar com um teste unitário que a ausência do campo dispara violação de validação
 - [ ] 7.2 Implementar `GoogleTokenVerifierService`, encapsulando `GoogleIdTokenVerifier` configurado com o `GOOGLE_CLIENT_ID`, e verificar com testes unitários (usando um verificador mockado) a validação de token válido, e a rejeição de assinatura/emissor/audiência inválidos e de token expirado
-- [ ] 7.3 Estender `AuthService` com `loginComGoogle` (valida o token via `GoogleTokenVerifierService`, rejeita se `email_verified` for falso, busca `Nutricionista` por `google_subject` e depois por e-mail, vincula a conta existente atualizando `google_subject` quando ausente, ou cria uma nova conta sem senha) e verificar com testes unitários os três fluxos: conta nova criada, conta existente vinculada, e-mail não verificado rejeitado
+- [ ] 7.3 Estender `AuthService` com `loginWithGoogle` (valida o token via `GoogleTokenVerifierService`, rejeita se `email_verified` for falso, busca `Nutritionist` por `googleSubject` e depois por e-mail, vincula a conta existente atualizando `googleSubject` quando ausente, ou cria uma nova conta sem senha) e verificar com testes unitários os três fluxos: conta nova criada, conta existente vinculada, e-mail não verificado rejeitado
 - [ ] 7.4 Implementar `POST /api/auth/google` em `AuthController`, sem exigir autenticação prévia, e verificar com testes de integração os cenários de sucesso (criação automática de conta e vinculação a conta existente, ambos retornando HTTP 200 + token) do spec `nutritionist-auth`
 - [ ] 7.5 Verificar com testes de integração os cenários de rejeição do spec `nutritionist-auth` (token Google inválido → 401, e-mail do Google não verificado → 401)
 

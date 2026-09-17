@@ -36,7 +36,7 @@ Adiciona-se um novo endpoint `POST /api/auth/google`, que recebe `{ "idToken": "
 
 Fluxo:
 1. O backend valida o `idToken` usando a biblioteca oficial `com.google.api-client:google-api-client` (`GoogleIdTokenVerifier`), verificando assinatura contra as chaves públicas (JWKS) do Google, emissor (`accounts.google.com`), audiência (Client ID configurado via `GOOGLE_CLIENT_ID`) e a claim `email_verified`.
-2. Se já existe `Nutricionista` com o e-mail do token (criado via cadastro tradicional ou por login Google anterior), autentica essa conta e grava/atualiza a claim `sub` do Google na coluna `google_subject` se ainda não estiver setada.
+2. Se já existe `Nutritionist` com o e-mail do token (criado via cadastro tradicional ou por login Google anterior), autentica essa conta e grava/atualiza a claim `sub` do Google na coluna `google_subject` se ainda não estiver setada.
 3. Se não existe, cria uma nova conta com nome e e-mail do token, `password_hash` nulo e `google_subject` preenchido, sem exigir senha.
 4. Em ambos os casos, emite um token de acesso via o mesmo `JwtService` usado pelo login tradicional.
 
@@ -51,11 +51,11 @@ Segue convenção por camada dentro do pacote base `com.br.nutri`, preparando pa
 ```
 com.br.nutri
 ├── nutritionist/
-│   ├── Nutricionista.java            (entidade JPA)
-│   ├── NutricionistaRepository.java
-│   ├── NutricionistaService.java
-│   ├── NutricionistaController.java   (POST /api/nutricionistas)
-│   └── dto/ (RegisterRequest, NutricionistaResponse)
+│   ├── Nutritionist.java              (entidade JPA)
+│   ├── NutritionistRepository.java
+│   ├── NutritionistService.java
+│   ├── NutritionistController.java    (POST /api/nutricionistas)
+│   └── dto/ (RegisterRequest, NutritionistResponse)
 ├── auth/
 │   ├── AuthController.java            (POST /api/auth/login, /api/auth/logout, /api/auth/google)
 │   ├── AuthService.java
@@ -71,26 +71,26 @@ com.br.nutri
     └── GlobalExceptionHandler.java     (@RestControllerAdvice)
 ```
 
-### Modelo de dados: entidade `Nutricionista`
-Tabela `nutricionistas`:
+### Modelo de dados: entidade `Nutritionist`
+Tabela `nutritionists`:
 | Coluna | Tipo | Constraints |
 |---|---|---|
 | `id` | `BIGINT` (auto-increment) | PK |
-| `nome` | `VARCHAR(255)` | NOT NULL |
-| `empresa` | `VARCHAR(255)` | NULL (opcional) |
+| `name` | `VARCHAR(255)` | NOT NULL |
+| `company` | `VARCHAR(255)` | NULL (opcional) |
 | `email` | `VARCHAR(255)` | NOT NULL, UNIQUE (armazenado em lowercase) |
 | `password_hash` | `VARCHAR(255)` | NULL (nunca exposto em DTO de resposta; nulo para contas criadas exclusivamente via Google) |
 | `google_subject` | `VARCHAR(255)` | NULL, UNIQUE quando presente (claim `sub` do token Google, usada para reconhecer a mesma conta Google em logins futuros mesmo se o e-mail mudar) |
-| `criado_em` | `TIMESTAMP` | NOT NULL, default now |
+| `created_at` | `TIMESTAMP` | NOT NULL, default now |
 
-Constraint de aplicação (não apenas de banco): todo `Nutricionista` deve ter `password_hash` não nulo, `google_subject` não nulo, ou ambos — nunca os dois nulos ao mesmo tempo, já que a conta precisa de pelo menos um método de autenticação.
+Constraint de aplicação (não apenas de banco): todo `Nutritionist` deve ter `password_hash` não nulo, `google_subject` não nulo, ou ambos — nunca os dois nulos ao mesmo tempo, já que a conta precisa de pelo menos um método de autenticação.
 
 Tabela auxiliar `revoked_tokens` (suporte ao logout stateless):
 | Coluna | Tipo | Constraints |
 |---|---|---|
 | `id` | `BIGINT` (auto-increment) | PK |
 | `jti` | `VARCHAR(255)` | NOT NULL, UNIQUE |
-| `expira_em` | `TIMESTAMP` | NOT NULL (usado para permitir limpeza futura) |
+| `expires_at` | `TIMESTAMP` | NOT NULL (usado para permitir limpeza futura) |
 
 Migração via **Flyway** (`spring-boot-starter-data-jpa` + script SQL versionado em `src/main/resources/db/migration`), em vez de `spring.jpa.hibernate.ddl-auto=update`, para que o schema seja explícito e versionado desde a primeira tabela do projeto.
 
@@ -108,12 +108,12 @@ Corpo JSON único para toda a API, retornado por um `@RestControllerAdvice` glob
 `error` é um código estável (`VALIDATION_ERROR`, `EMAIL_ALREADY_IN_USE`, `INVALID_CREDENTIALS`, `UNAUTHORIZED`) que o frontend pode usar para lógica condicional sem depender do texto de `message`. `details` é omitido quando não há múltiplos campos a reportar.
 
 ### Estratégia de testes
-- **Testes unitários** (`spring-boot-starter-*-test`, JUnit 5): validação de regras de negócio no `NutricionistaService` (rejeição de e-mail duplicado, hashing de senha, campo empresa opcional) e no `AuthService`/`JwtService` (emissão, expiração, rejeição de token revogado), usando mocks de repositório. `GoogleTokenVerifierService` é testado com um `GoogleIdTokenVerifier` mockado, cobrindo token válido, assinatura/emissor/audiência inválidos e e-mail não verificado, sem depender de rede.
+- **Testes unitários** (`spring-boot-starter-*-test`, JUnit 5): validação de regras de negócio no `NutritionistService` (rejeição de e-mail duplicado, hashing de senha, campo empresa opcional) e no `AuthService`/`JwtService` (emissão, expiração, rejeição de token revogado), usando mocks de repositório. `GoogleTokenVerifierService` é testado com um `GoogleIdTokenVerifier` mockado, cobrindo token válido, assinatura/emissor/audiência inválidos e e-mail não verificado, sem depender de rede.
 - **Testes de integração**: `@SpringBootTest` + `MockMvc` (ou `@WebMvcTest` para os controllers com serviços mockados) cobrindo cada cenário do spec delta (cadastro sucesso/duplicado/validação, login sucesso/credenciais inválidas, login tradicional em conta só-Google, login e cadastro automático via Google, vinculação a conta existente via Google, token Google inválido/e-mail não verificado, logout, acesso negado sem token/token inválido) contra um banco de teste (H2 ou Testcontainers MySQL — a decidir na tarefa de setup, ver tasks.md).
 
 ## Riscos / Trade-offs
 
-- [Denylist de tokens revogados cresce indefinidamente sem rotina de limpeza] → Aceito nesta change porque o volume inicial é baixo; uma mudança futura deve adicionar expurgo agendado de registros com `expira_em` no passado.
+- [Denylist de tokens revogados cresce indefinidamente sem rotina de limpeza] → Aceito nesta change porque o volume inicial é baixo; uma mudança futura deve adicionar expurgo agendado de registros com `expires_at` no passado.
 - [Sem rate limiting no login, uma tentativa de força bruta de senha não é mitigada nesta change] → Aceito como não-objetivo explícito; sinalizado para uma mudança de segurança futura antes de produção.
 - [Chave de assinatura JWT única (HS256) versus par de chaves assimétrico] → HS256 com chave simétrica escolhido por simplicidade, já que o mesmo backend emite e valida o token (não há terceiro validando o token de forma independente); migrar para RS256 é possível depois sem mudar o contrato de API se necessário.
 - [Escolha entre H2 e Testcontainers para testes de integração ainda em aberto] → Não bloqueia a especificação nem a lista de tarefas; será decidido na tarefa de setup do ambiente de teste (tasks.md), pois qualquer uma das opções satisfaz os mesmos cenários de teste.
