@@ -6,8 +6,9 @@
 - [ ] 1.2 Adicionar dependência do Flyway (`org.flywaydb:flyway-core` + `flyway-mysql`) ao `build.gradle` e verificar que a aplicação sobe com `spring.jpa.hibernate.ddl-auto=validate` (schema gerenciado só pelo Flyway a partir daqui)
 - [ ] 1.3 Adicionar dependência de validação de token Google (`com.google.api-client:google-api-client`) ao `build.gradle` e verificar que `./gradlew build` resolve a dependência sem erro
 - [ ] 1.4 Decidir e configurar a estratégia de banco de dados de teste (H2 em memória ou Testcontainers MySQL, ver design.md - Riscos/Trade-offs) e verificar que um teste de contexto Spring (`@SpringBootTest`) sobe com sucesso usando essa estratégia
-- [ ] 1.5 Adicionar propriedades de configuração da chave/segredo JWT e do tempo de expiração do token em `application.properties` (via variável de ambiente, sem valor hardcoded) e verificar que a aplicação falha ao subir se a variável obrigatória estiver ausente
+- [ ] 1.5 Adicionar propriedades de configuração da chave/segredo JWT e do tempo de expiração do token em `application.properties` (via variável de ambiente, sem valor hardcoded; valor sugerido em design.md: 3600 segundos) e verificar que a aplicação falha ao subir se a variável obrigatória estiver ausente
 - [ ] 1.6 Adicionar a propriedade de configuração `GOOGLE_CLIENT_ID` (via variável de ambiente) em `application.properties` e verificar que a aplicação falha ao subir se a variável obrigatória estiver ausente
+- [ ] 1.7 Adicionar a propriedade de configuração `ALLOWED_ORIGINS` (via variável de ambiente, uma ou mais origens permitidas para CORS) em `application.properties` e verificar que a aplicação falha ao subir se a variável obrigatória estiver ausente
 
 ## 2. Modelo de Dados e Migração
 
@@ -15,6 +16,7 @@
 - [ ] 2.2 Criar a migração Flyway (`V2__create_revoked_tokens.sql`) para a tabela `revoked_tokens` (`id`, `jti` único, `expires_at`) e verificar que a migração aplica sem erro
 - [ ] 2.3 Implementar a entidade JPA `Nutritionist` (campos `name`, `company` nullable, `email`, `passwordHash` nullable, `googleSubject` nullable) e o repositório `NutritionistRepository` (busca por e-mail case-insensitive e busca por `googleSubject`) e verificar com um teste de repositório (`@DataJpaTest`) que as constraints de unicidade de e-mail e de `google_subject` são respeitadas
 - [ ] 2.4 Implementar a entidade JPA `RevokedToken` e o repositório `RevokedTokenRepository` e verificar com um teste de repositório que um `jti` inserido é encontrado por busca e que duplicatas são rejeitadas
+- [ ] 2.5 Verificar com um teste unitário/repositório que não é possível persistir um `Nutritionist` com `passwordHash` e `googleSubject` nulos simultaneamente (invariante de aplicação descrita em design.md - Modelo de dados)
 
 ## 3. Camada de Segurança
 
@@ -22,18 +24,21 @@
 - [ ] 3.2 Implementar `JwtService` (emissão de token com `jti`, `sub` = id do nutricionista, expiração; validação e parse) e verificar com testes unitários a emissão, a validação de um token válido e a rejeição de um token expirado ou com assinatura inválida
 - [ ] 3.3 Implementar `JwtAuthenticationFilter` que extrai o token do cabeçalho `Authorization: Bearer`, valida contra `JwtService` e `RevokedTokenRepository`, e popula o `SecurityContext` com a identidade do nutricionista e verificar com um teste de filtro que uma requisição com token válido popula o contexto de segurança
 - [ ] 3.4 Configurar `SecurityConfig` (`SecurityFilterChain`) para exigir autenticação em todos os endpoints exceto cadastro, login e login via Google, registrar o `JwtAuthenticationFilter`, e verificar com um teste de integração que um endpoint protegido de teste retorna HTTP 401 sem token
+- [ ] 3.5 Configurar CORS no `SecurityConfig` usando as origens de `ALLOWED_ORIGINS`, liberando os métodos `GET`/`POST`/`PUT`/`DELETE` e o cabeçalho `Authorization`, e verificar com um teste de integração que uma requisição com origem permitida recebe os cabeçalhos `Access-Control-Allow-*` esperados
+- [ ] 3.6 Desabilitar CSRF e configurar `SessionCreationPolicy.STATELESS` no `SecurityConfig` (ver design.md - Configuração de CORS, CSRF e política de sessão) e verificar com um teste de integração que um `POST` autenticado por token (sem cookie de sessão) não é bloqueado por proteção CSRF
 
 ## 4. Tratamento de Erros
 
 - [ ] 4.1 Implementar o DTO `ApiError` no formato definido em design.md (status, error, message, details, timestamp) e verificar com um teste unitário de serialização que o JSON gerado segue exatamente essa estrutura
-- [ ] 4.2 Implementar `GlobalExceptionHandler` (`@RestControllerAdvice`) mapeando erros de validação (`MethodArgumentNotValidException` → 400 `VALIDATION_ERROR`), autenticação (`AuthenticationException`/credenciais inválidas → 401 `INVALID_CREDENTIALS`/`UNAUTHORIZED`), conflito de e-mail (→ 409 `EMAIL_ALREADY_IN_USE`) e falha de validação de token Google (→ 401 `GOOGLE_TOKEN_INVALID`), e verificar com testes de integração que cada tipo de erro retorna o código HTTP e o corpo `ApiError` esperados
+- [ ] 4.2 Implementar `GlobalExceptionHandler` (`@RestControllerAdvice`) mapeando erros de validação (`MethodArgumentNotValidException` → 400 `VALIDATION_ERROR`), autenticação (`AuthenticationException`/credenciais inválidas → 401 `INVALID_CREDENTIALS`/`UNAUTHORIZED`), conflito de e-mail (→ 409 `EMAIL_ALREADY_IN_USE`, incluindo quando originado por `DataIntegrityViolationException` de uma corrida de cadastro) e falha de validação de token Google (→ 401 `GOOGLE_TOKEN_INVALID`), e verificar com testes de integração que cada tipo de erro retorna o código HTTP e o corpo `ApiError` esperados
 
 ## 5. Endpoint de Cadastro de Nutricionista
 
-- [ ] 5.1 Implementar os DTOs `RegisterRequest` (campos `name` com `@NotBlank`, `email` com `@Email`, `password` com validação de política de senha, `company` opcional sem `@NotBlank`) e `NutritionistResponse` (name, company, email — sem senha/hash) e verificar com testes unitários que payloads inválidos (nome vazio, e-mail malformado, senha fraca) disparam violação de validação, e que a ausência de empresa não dispara violação
-- [ ] 5.2 Implementar `NutritionistService.register` (normaliza e-mail para lowercase, verifica duplicidade, aplica hash de senha, persiste name/company/email/password) e verificar com um teste unitário que um e-mail já existente lança a exceção de conflito mapeada em 4.2
+- [ ] 5.1 Implementar os DTOs `RegisterRequest` (campos `name` com `@NotBlank` e `@Size(max = 255)`, `email` com `@Email`, `password` com validação de política de senha e `@Size(min = 8, max = 72)`, `company` opcional com `@Size(max = 255)` quando presente, sem `@NotBlank`) e `NutritionistResponse` (name, company, email — sem senha/hash) e verificar com testes unitários que payloads inválidos (nome vazio ou só espaços, nome/empresa acima de 255 caracteres, e-mail malformado, senha fraca ou acima de 72 caracteres) disparam violação de validação, e que a ausência de empresa não dispara violação
+- [ ] 5.2 Implementar `NutritionistService.register` (normaliza e-mail para lowercase, verifica duplicidade, aplica hash de senha, persiste name/company/email/password, e captura `DataIntegrityViolationException` na persistência traduzindo para o erro de conflito mapeado em 4.2) e verificar com testes unitários que um e-mail já existente — detectado tanto pela checagem prévia quanto pela constraint única do banco — lança a exceção de conflito mapeada em 4.2
 - [ ] 5.3 Implementar `NutritionistController` com `POST /api/nutricionistas` e verificar com um teste de integração (`MockMvc`) os cenários de sucesso com e sem empresa (HTTP 201 + corpo sem senha) do spec `nutritionist-auth`
-- [ ] 5.4 Verificar com testes de integração os cenários de rejeição do spec `nutritionist-auth` (e-mail duplicado → 409, campo obrigatório ausente → 400, e-mail inválido → 400, senha fraca → 400)
+- [ ] 5.4 Verificar com testes de integração os cenários de rejeição do spec `nutritionist-auth` (e-mail duplicado → 409, campo obrigatório ausente → 400, e-mail inválido → 400, senha fraca → 400, nome/empresa só com espaços → 400, campos acima do tamanho máximo → 400)
+- [ ] 5.5 Verificar com um teste de integração (disparando duas requisições concorrentes com o mesmo e-mail ainda não cadastrado, ex.: via `ExecutorService`/threads) que exatamente uma delas cria a conta (HTTP 201) e a outra é rejeitada como e-mail duplicado (HTTP 409), cobrindo o cenário "Cadastros concorrentes com o mesmo e-mail" do spec `nutritionist-auth`
 
 ## 6. Endpoint de Login (E-mail/Senha)
 
@@ -44,11 +49,12 @@
 
 ## 7. Login e Cadastro via Conta Google
 
-- [ ] 7.1 Implementar o DTO `GoogleLoginRequest` (campo `idToken`) e verificar com um teste unitário que a ausência do campo dispara violação de validação
+- [ ] 7.1 Implementar o DTO `GoogleLoginRequest` (campo `idToken`) e o DTO `GoogleLoginResponse` (campos `token` e `accountCreated`) e verificar com um teste unitário que a ausência de `idToken` dispara violação de validação
 - [ ] 7.2 Implementar `GoogleTokenVerifierService`, encapsulando `GoogleIdTokenVerifier` configurado com o `GOOGLE_CLIENT_ID`, e verificar com testes unitários (usando um verificador mockado) a validação de token válido, e a rejeição de assinatura/emissor/audiência inválidos e de token expirado
-- [ ] 7.3 Estender `AuthService` com `loginWithGoogle` (valida o token via `GoogleTokenVerifierService`, rejeita se `email_verified` for falso, busca `Nutritionist` por `googleSubject` e depois por e-mail, vincula a conta existente atualizando `googleSubject` quando ausente, ou cria uma nova conta sem senha) e verificar com testes unitários os três fluxos: conta nova criada, conta existente vinculada, e-mail não verificado rejeitado
-- [ ] 7.4 Implementar `POST /api/auth/google` em `AuthController`, sem exigir autenticação prévia, e verificar com testes de integração os cenários de sucesso (criação automática de conta e vinculação a conta existente, ambos retornando HTTP 200 + token) do spec `nutritionist-auth`
-- [ ] 7.5 Verificar com testes de integração os cenários de rejeição do spec `nutritionist-auth` (token Google inválido → 401, e-mail do Google não verificado → 401)
+- [ ] 7.3 Estender `AuthService` com `loginWithGoogle` (valida o token via `GoogleTokenVerifierService`, rejeita se `email_verified` for falso, busca `Nutritionist` por `googleSubject` e depois por e-mail, vincula a conta existente atualizando apenas `googleSubject` — sem sobrescrever `name`/`company` já cadastrados — quando ausente, ou cria uma nova conta sem senha capturando `DataIntegrityViolationException` e reconsultando por e-mail em caso de corrida concorrente) e verificar com testes unitários os quatro fluxos: conta nova criada, conta existente vinculada com perfil preservado, e-mail não verificado rejeitado, e corrida concorrente resolvida sem erro
+- [ ] 7.4 Implementar `POST /api/auth/google` em `AuthController`, sem exigir autenticação prévia, sempre respondendo HTTP 200 com `GoogleLoginResponse` (token + `accountCreated`), e verificar com testes de integração os cenários de sucesso (criação automática de conta com `accountCreated=true` e vinculação a conta existente com `accountCreated=false`) do spec `nutritionist-auth`
+- [ ] 7.5 Verificar com testes de integração os cenários de rejeição do spec `nutritionist-auth` (token Google inválido → 401, e-mail do Google não verificado → 401) e o cenário "Perfil existente preservado ao vincular conta Google" (nome/empresa da conta existente permanecem inalterados após login via Google)
+- [ ] 7.6 Verificar com um teste de integração (disparando duas chamadas concorrentes de login via Google com o mesmo e-mail ainda não cadastrado) que exatamente uma conta é criada e ambas as chamadas terminam autenticadas na mesma conta, cobrindo o cenário "Logins via Google concorrentes para conta nova" do spec `nutritionist-auth`
 
 ## 8. Endpoint de Logout
 
@@ -56,10 +62,11 @@
 - [ ] 8.2 Implementar `POST /api/auth/logout` em `AuthController`, exigindo autenticação, e verificar com um teste de integração o cenário de sucesso (HTTP 200) e o cenário de logout sem autenticação (HTTP 401) do spec `nutritionist-auth`
 - [ ] 8.3 Verificar com um teste de integração que, após logout bem-sucedido, uma nova requisição a um endpoint protegido usando o mesmo token é rejeitada com HTTP 401, tanto para tokens emitidos por login tradicional quanto por login via Google
 
-## 9. Verificação de Isolamento e Autorização
+## 9. Endpoint de Perfil e Verificação de Isolamento/Autorização
 
 - [ ] 9.1 Implementar um mecanismo reutilizável (ex.: método utilitário ou anotação de argumento de controller) para resolver o nutricionista autenticado a partir do `SecurityContext`, para uso pelas capacidades futuras, e verificar com um teste unitário que retorna o id correto a partir de um contexto de segurança populado pelo filtro
-- [ ] 9.2 Adicionar um endpoint de teste temporário (ou reutilizar `GET` do próprio perfil, se aplicável) protegido por autenticação e verificar com testes de integração os cenários "acesso não autenticado negado" e "acesso com token inválido ou adulterado negado" do spec `nutritionist-auth`
+- [ ] 9.2 Implementar `GET /api/nutricionistas/me` em `NutritionistController`, retornando `NutritionistResponse` do nutricionista resolvido pelo mecanismo de 9.1, e verificar com um teste de integração o cenário "Perfil retornado com sucesso" (HTTP 200 com nome, empresa e e-mail, sem senha/hash) do spec `nutritionist-auth`
+- [ ] 9.3 Verificar com testes de integração, usando o endpoint `GET /api/nutricionistas/me` como endpoint protegido de referência, os cenários "Consulta de perfil sem autenticação negada", "acesso não autenticado negado" e "acesso com token inválido ou adulterado negado" do spec `nutritionist-auth`
 
 ## 10. Validação da Especificação e Revisão Final
 
@@ -69,5 +76,5 @@
 
 ## 11. Documentação
 
-- [ ] 11.1 Documentar os quatro endpoints (cadastro, login, login via Google, logout) — método, path, payload de request/response e códigos de erro — em um arquivo `API.md` ou anotações OpenAPI/Springdoc, e verificar que cada endpoint documentado corresponde a um teste de integração existente
-- [ ] 11.2 Atualizar o `README.md` do projeto com instruções de setup (variáveis de ambiente de banco de dados, segredo JWT e `GOOGLE_CLIENT_ID` necessárias, incluindo como obter um Client ID de teste no Google Cloud Console) e verificar que um novo desenvolvedor consegue subir a aplicação localmente seguindo apenas essas instruções
+- [ ] 11.1 Documentar os cinco endpoints (cadastro, consulta do próprio perfil, login, login via Google, logout) — método, path, payload de request/response e códigos de erro — em um arquivo `API.md` ou anotações OpenAPI/Springdoc, e verificar que cada endpoint documentado corresponde a um teste de integração existente
+- [ ] 11.2 Atualizar o `README.md` do projeto com instruções de setup (variáveis de ambiente de banco de dados, segredo/expiração JWT, `GOOGLE_CLIENT_ID` e `ALLOWED_ORIGINS` necessárias, incluindo como obter um Client ID de teste no Google Cloud Console) e verificar que um novo desenvolvedor consegue subir a aplicação localmente seguindo apenas essas instruções
