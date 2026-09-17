@@ -7,18 +7,22 @@ Fornecer, via API REST, o cadastro de conta e a autenticação de nutricionistas
 ## ADDED Requirements
 
 ### Requirement: Cadastro de Nutricionista via API
-O sistema DEVE expor um endpoint público que permita criar uma conta de nutricionista informando, no mínimo, nome completo, e-mail e senha, e DEVE persistir o e-mail em caixa baixa e de forma única, rejeitando qualquer tentativa de cadastro com um e-mail já existente (comparação case-insensitive).
+O sistema DEVE expor um endpoint público que permita criar uma conta de nutricionista informando, no mínimo, nome, e-mail e senha, e opcionalmente uma empresa, e DEVE persistir o e-mail em caixa baixa e de forma única, rejeitando qualquer tentativa de cadastro com um e-mail já existente (comparação case-insensitive).
 
-#### Scenario: Cadastro bem-sucedido
-- **WHEN** uma requisição de cadastro é enviada com nome completo, e-mail ainda não utilizado e senha válida
-- **THEN** o sistema cria a conta do nutricionista, armazena a senha apenas em forma de hash e responde com HTTP 201 e os dados públicos do nutricionista (sem a senha ou seu hash)
+#### Scenario: Cadastro bem-sucedido sem empresa
+- **WHEN** uma requisição de cadastro é enviada com nome, e-mail ainda não utilizado, senha válida, e sem informar empresa
+- **THEN** o sistema cria a conta do nutricionista sem empresa associada, armazena a senha apenas em forma de hash e responde com HTTP 201 e os dados públicos do nutricionista (sem a senha ou seu hash)
+
+#### Scenario: Cadastro bem-sucedido com empresa
+- **WHEN** uma requisição de cadastro é enviada com nome, e-mail ainda não utilizado, senha válida, e uma empresa informada
+- **THEN** o sistema cria a conta do nutricionista com a empresa associada e responde com HTTP 201 e os dados públicos do nutricionista, incluindo a empresa informada
 
 #### Scenario: E-mail duplicado rejeitado
 - **WHEN** uma requisição de cadastro é enviada com um e-mail que já pertence a uma conta existente, independentemente de diferenças de maiúsculas/minúsculas
 - **THEN** o sistema rejeita a requisição com HTTP 409 e um corpo de erro indicando que o e-mail já está em uso, sem criar nova conta
 
 ### Requirement: Validação dos Dados de Cadastro
-O sistema DEVE validar os dados de cadastro antes de criar a conta: nome completo não pode ser vazio, e-mail deve estar em formato de e-mail válido, e senha deve atender a uma política mínima de força (mínimo de 8 caracteres, contendo ao menos uma letra e um número).
+O sistema DEVE validar os dados de cadastro antes de criar a conta: nome não pode ser vazio, e-mail deve estar em formato de e-mail válido, senha deve atender a uma política mínima de força (mínimo de 8 caracteres, contendo ao menos uma letra e um número), e empresa, quando informada, não pode ser uma string vazia. A ausência de empresa nunca é motivo de rejeição.
 
 #### Scenario: Campo obrigatório ausente
 - **WHEN** uma requisição de cadastro é enviada sem nome, sem e-mail ou sem senha
@@ -32,6 +36,10 @@ O sistema DEVE validar os dados de cadastro antes de criar a conta: nome complet
 - **WHEN** uma requisição de cadastro é enviada com uma senha menor que 8 caracteres ou sem combinar letra e número
 - **THEN** o sistema rejeita a requisição com HTTP 400 e não cria a conta
 
+#### Scenario: Empresa ausente é aceita
+- **WHEN** uma requisição de cadastro é enviada sem o campo empresa
+- **THEN** o sistema não rejeita a requisição por causa desse campo e cria a conta normalmente
+
 ### Requirement: Login do Nutricionista via API
 O sistema DEVE expor um endpoint público que autentique um nutricionista existente por e-mail e senha e, em caso de sucesso, retorne um token de acesso que o cliente deve enviar nas requisições subsequentes a endpoints protegidos.
 
@@ -42,6 +50,29 @@ O sistema DEVE expor um endpoint público que autentique um nutricionista existe
 #### Scenario: Credenciais inválidas rejeitadas
 - **WHEN** uma requisição de login é enviada com um e-mail não cadastrado, ou com uma senha que não corresponde ao e-mail informado
 - **THEN** o sistema rejeita a requisição com HTTP 401, sem emitir token, e sem indicar se o e-mail existe ou não
+
+#### Scenario: Login tradicional em conta sem senha local
+- **WHEN** uma requisição de login por e-mail/senha é enviada para uma conta que foi criada exclusivamente via login com Google e não possui senha local cadastrada
+- **THEN** o sistema rejeita a requisição com HTTP 401, com o mesmo formato de erro de credenciais inválidas, sem indicar que a conta existe apenas via Google
+
+### Requirement: Login e Cadastro via Conta Google
+O sistema DEVE permitir que um nutricionista se autentique usando uma conta Google (OAuth 2.0/OpenID Connect) como alternativa ao login por e-mail/senha, aceitando um token de identidade emitido pelo Google, validando sua autenticidade, emissor e verificação de e-mail antes de conceder acesso. Quando não existir conta de nutricionista com o e-mail da conta Google, o sistema DEVE criar uma automaticamente a partir do nome e e-mail informados pelo token, sem senha local. Quando já existir conta de nutricionista com esse e-mail (criada via cadastro tradicional ou via Google anteriormente), o sistema DEVE autenticar essa conta existente em vez de criar uma duplicata.
+
+#### Scenario: Login via Google com criação automática de conta
+- **WHEN** um token de identidade Google válido, com e-mail verificado, é enviado e nenhuma conta de nutricionista existe com esse e-mail
+- **THEN** o sistema cria uma conta de nutricionista com nome e e-mail obtidos do token, sem senha local, e responde com HTTP 200 (ou 201) e um token de acesso válido para essa conta
+
+#### Scenario: Login via Google vinculado a conta existente
+- **WHEN** um token de identidade Google válido é enviado e já existe uma conta de nutricionista com o mesmo e-mail
+- **THEN** o sistema concede um token de acesso válido para essa conta existente, sem criar uma conta duplicada
+
+#### Scenario: Token do Google inválido rejeitado
+- **WHEN** o token de identidade enviado não pode ser validado (assinatura inválida, emissor diferente do Google, audiência incorreta, ou token expirado)
+- **THEN** o sistema rejeita a requisição com HTTP 401 e não concede acesso nem cria conta
+
+#### Scenario: E-mail do Google não verificado rejeitado
+- **WHEN** o token de identidade do Google indica que o e-mail associado não foi verificado
+- **THEN** o sistema rejeita a requisição com HTTP 401 e não concede acesso nem cria conta
 
 ### Requirement: Logout do Nutricionista
 O sistema DEVE expor um endpoint que permita a um nutricionista autenticado encerrar sua sessão atual, de forma que o token usado nessa sessão deixe de ser aceito para autenticar novas requisições.
