@@ -59,6 +59,10 @@ O sistema DEVE expor um endpoint público que autentique um nutricionista existe
 - **WHEN** uma requisição de login é enviada com o e-mail e a senha corretos de uma conta de nutricionista existente
 - **THEN** o sistema responde com HTTP 200 e um token de acesso válido associado a esse nutricionista
 
+#### Scenario: Campo obrigatório ausente
+- **WHEN** uma requisição de login é enviada sem e-mail ou sem senha
+- **THEN** o sistema rejeita a requisição com HTTP 400 e um corpo de erro identificando qual(is) campo(s) são inválidos, sem emitir token
+
 #### Scenario: Credenciais inválidas rejeitadas
 - **WHEN** uma requisição de login é enviada com um e-mail não cadastrado, ou com uma senha que não corresponde ao e-mail informado
 - **THEN** o sistema rejeita a requisição com HTTP 401, sem emitir token, e sem indicar se o e-mail existe ou não
