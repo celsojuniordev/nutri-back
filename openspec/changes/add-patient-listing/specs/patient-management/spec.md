@@ -7,7 +7,7 @@ Permitir que um nutricionista autenticado liste, visualize o detalhe e pesquise 
 ## ADDED Requirements
 
 ### Requirement: Listagem Paginada de Pacientes
-O sistema DEVE expor um endpoint protegido que retorne, de forma paginada, apenas os pacientes ativos pertencentes ao nutricionista autenticado, ordenáveis, sem exigir nenhum parâmetro de filtro. Este é o conteúdo apresentado ao nutricionista imediatamente após um login bem-sucedido (conforme já definido na capacidade `nutritionist-auth`).
+O sistema DEVE expor um endpoint protegido que retorne, de forma paginada, apenas os pacientes ativos pertencentes ao nutricionista autenticado, ordenáveis, sem exigir nenhum parâmetro de filtro. Este é o conteúdo apresentado ao nutricionista imediatamente após um login bem-sucedido (conforme já definido na capacidade `nutritionist-auth`). Quando o tamanho de página não for informado, o sistema DEVE utilizar 25 itens por página; quando informado, o sistema DEVE aceitar apenas os tamanhos 10, 25 ou 50 (as mesmas opções apresentadas ao nutricionista em um campo de seleção no final da tela de listagem), rejeitando qualquer outro valor.
 
 #### Scenario: Listagem retorna apenas pacientes ativos do próprio nutricionista
 - **WHEN** um nutricionista autenticado solicita sua lista de pacientes
@@ -29,8 +29,12 @@ O sistema DEVE expor um endpoint protegido que retorne, de forma paginada, apena
 - **WHEN** um nutricionista autenticado com mais pacientes ativos do que o tamanho de uma página solicita uma página específica
 - **THEN** o sistema retorna somente os pacientes correspondentes àquela página, com os metadados de paginação refletindo o total real de pacientes ativos desse nutricionista
 
-#### Scenario: Tamanho de página acima do limite rejeitado
-- **WHEN** uma requisição de listagem informa um tamanho de página maior que o máximo permitido
+#### Scenario: Tamanho de página padrão aplicado quando não informado
+- **WHEN** um nutricionista autenticado solicita sua lista de pacientes sem informar o tamanho de página
+- **THEN** o sistema retorna a listagem usando 25 itens por página
+
+#### Scenario: Tamanho de página fora das opções permitidas rejeitado
+- **WHEN** uma requisição de listagem informa um tamanho de página diferente de 10, 25 ou 50
 - **THEN** o sistema rejeita a requisição com HTTP 400 e um corpo de erro identificando o parâmetro inválido
 
 #### Scenario: Listagem sem autenticação negada

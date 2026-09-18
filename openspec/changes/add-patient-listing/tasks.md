@@ -11,14 +11,14 @@
 
 - [ ] 2.1 Implementar o DTO `PatientResponse` (id, fullName, birthDate, sex, email, phone, active) e verificar com um teste unitário de serialização que o JSON gerado contém exatamente esses campos
 - [ ] 2.2 Implementar um DTO de página (ex.: `PageResponse<T>` com content, page, size, totalElements, totalPages) reutilizável pelos endpoints de listagem e busca, e verificar com um teste unitário que ele é construído corretamente a partir de um `org.springframework.data.domain.Page`
-- [ ] 2.3 Implementar validação de parâmetros de paginação (tamanho padrão 20, máximo 100) e verificar com um teste unitário que um `size` acima de 100 é rejeitado
+- [ ] 2.3 Implementar validação de parâmetros de paginação (tamanho padrão 25 quando `size` não informado; valores aceitos: 10, 25 ou 50) e verificar com testes unitários que um `size` fora desse conjunto é rejeitado e que a ausência do parâmetro resulta em tamanho de página 25
 
 ## 3. Endpoint de Listagem
 
 - [ ] 3.1 Implementar `PatientService.listActive(nutritionistId, pageable)` reutilizando o repositório de 1.3 e verificar com um teste unitário que delega corretamente ao repositório com o `nutritionistId` do nutricionista autenticado
 - [ ] 3.2 Implementar `PatientController` com `GET /api/pacientes`, protegido por autenticação, resolvendo o nutricionista autenticado via `CurrentNutritionist`, e verificar com testes de integração (`MockMvc`) os cenários "Listagem retorna apenas pacientes ativos do próprio nutricionista", "Pacientes de outro nutricionista não aparecem", "Pacientes inativos não aparecem na listagem padrão" e "Listagem sem pacientes cadastrados" do spec `patient-management`
 - [ ] 3.3 Verificar com um teste de integração o cenário "Paginação respeitada" do spec `patient-management` (inserindo mais pacientes do que uma página e solicitando páginas específicas)
-- [ ] 3.4 Verificar com um teste de integração o cenário "Tamanho de página acima do limite rejeitado" (HTTP 400) e o cenário "Listagem sem autenticação negada" (HTTP 401) do spec `patient-management`
+- [ ] 3.4 Verificar com testes de integração os cenários "Tamanho de página padrão aplicado quando não informado" (25 itens), "Tamanho de página fora das opções permitidas rejeitado" (HTTP 400) e "Listagem sem autenticação negada" (HTTP 401) do spec `patient-management`
 
 ## 4. Endpoint de Detalhe
 
