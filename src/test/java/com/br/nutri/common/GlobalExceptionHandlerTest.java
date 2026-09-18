@@ -65,6 +65,29 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void mapsPatientNotFoundTo404() throws Exception {
+        mockMvc.perform(get("/test/errors/patient-not-found").header("Authorization", bearerToken()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error").value("PATIENT_NOT_FOUND"));
+    }
+
+    @Test
+    void mapsInvalidPageSizeTo400WithFieldDetail() throws Exception {
+        mockMvc.perform(get("/test/errors/invalid-page-size").header("Authorization", bearerToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_PAGE_SIZE"))
+                .andExpect(jsonPath("$.details[0].field").value("size"));
+    }
+
+    @Test
+    void mapsInvalidDateRangeTo400WithFieldDetail() throws Exception {
+        mockMvc.perform(get("/test/errors/invalid-date-range").header("Authorization", bearerToken()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("INVALID_DATE_RANGE"))
+                .andExpect(jsonPath("$.details[0].field").value("dataNascimentoInicio"));
+    }
+
+    @Test
     void mapsValidationFailureTo400WithFieldDetails() throws Exception {
         mockMvc.perform(post("/test/errors/validation")
                         .header("Authorization", bearerToken())
@@ -96,6 +119,21 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test/errors/google-token-invalid")
         String googleTokenInvalid() {
             throw new GoogleTokenInvalidException("token inválido");
+        }
+
+        @GetMapping("/test/errors/patient-not-found")
+        String patientNotFound() {
+            throw new PatientNotFoundException();
+        }
+
+        @GetMapping("/test/errors/invalid-page-size")
+        String invalidPageSize() {
+            throw new InvalidPageSizeException();
+        }
+
+        @GetMapping("/test/errors/invalid-date-range")
+        String invalidDateRange() {
+            throw new InvalidDateRangeException();
         }
 
         @PostMapping("/test/errors/validation")
