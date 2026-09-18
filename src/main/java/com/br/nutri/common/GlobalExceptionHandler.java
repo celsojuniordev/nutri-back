@@ -55,4 +55,25 @@ public class GlobalExceptionHandler {
                 "Autenticação necessária para acessar este recurso.");
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
+
+    @ExceptionHandler(PatientNotFoundException.class)
+    public ResponseEntity<ApiError> handlePatientNotFound(PatientNotFoundException ex) {
+        ApiError error = new ApiError(HttpStatus.NOT_FOUND.value(), "PATIENT_NOT_FOUND", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+    }
+
+    @ExceptionHandler(InvalidPageSizeException.class)
+    public ResponseEntity<ApiError> handleInvalidPageSize(InvalidPageSizeException ex) {
+        List<ApiError.FieldError> details = List.of(new ApiError.FieldError("size", ex.getMessage()));
+        ApiError error = new ApiError(HttpStatus.BAD_REQUEST.value(), "INVALID_PAGE_SIZE", ex.getMessage(), details);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
+
+    @ExceptionHandler(InvalidDateRangeException.class)
+    public ResponseEntity<ApiError> handleInvalidDateRange(InvalidDateRangeException ex) {
+        List<ApiError.FieldError> details =
+                List.of(new ApiError.FieldError("dataNascimentoInicio", ex.getMessage()));
+        ApiError error = new ApiError(HttpStatus.BAD_REQUEST.value(), "INVALID_DATE_RANGE", ex.getMessage(), details);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+    }
 }
